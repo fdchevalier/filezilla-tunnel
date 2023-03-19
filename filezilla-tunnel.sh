@@ -1,9 +1,9 @@
 #!/bin/bash
 # Title: filezilla-tunnel.sh
-# Version: 0.0
+# Version: 0.1
 # Author: Frédéric CHEVALIER <fcheval@txbiomed.org>
 # Created in: 2022-01-23
-# Modified in: 
+# Modified in: 2023-03-18
 # Licence : GPL v3
 
 
@@ -20,6 +20,7 @@ aim="Create a SSH tunnel and start Filezilla to connect to it."
 # Versions #
 #==========#
 
+# v0.1 - 2023-03-18: add dependency tests
 # v0.0 - 2022-01-23: creation
 
 version=$(grep -i -m 1 "version" "$0" | cut -d ":" -f 2 | sed "s/^ *//g")
@@ -107,6 +108,8 @@ function test_dep {
 #==============#
 
 test_dep ssh
+test_dep filezilla
+test_dep netstat
 
 
 
