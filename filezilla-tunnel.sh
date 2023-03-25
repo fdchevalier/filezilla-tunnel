@@ -1,9 +1,9 @@
 #!/bin/bash
 # Title: filezilla-tunnel.sh
-# Version: 0.1
+# Version: 1.0
 # Author: Frédéric CHEVALIER <fcheval@txbiomed.org>
 # Created in: 2022-01-23
-# Modified in: 2023-03-18
+# Modified in: 2023-03-25
 # Licence : GPL v3
 
 
@@ -20,6 +20,7 @@ aim="Create a SSH tunnel and start Filezilla to connect to it."
 # Versions #
 #==========#
 
+# v1.0 - 2023-03-25: handle unlimited number of hosts instead of 2 hosts only / update argument names because of conflicts
 # v0.1 - 2023-03-18: add dependency tests
 # v0.0 - 2022-01-23: creation
 
@@ -34,7 +35,7 @@ version=$(grep -i -m 1 "version" "$0" | cut -d ":" -f 2 | sed "s/^ *//g")
 # Usage message
 function usage {
     echo -e "
-    \e[32m ${0##*/} \e[00m -u|--username string -h1|--host1 host -h2|--host2 host2 -s|--ssha -p|--sshp -h|--help
+    \e[32m ${0##*/} \e[00m -u|--username string -s|--host hosts -a|--ssha -p|--sshp -h|--help
 
 Aim: $aim
 
@@ -42,9 +43,9 @@ Version: $version
 
 Options:
     -u,  --username   username to connect to the servers [default: $USER]
-    -h1, --host1      first host to connect to set the tunnel up
-    -h2, --host2      second host to connect 
-    -s,  --ssha       force the creation of a new ssh agent
+    -s,  --host       list of hosts, space separated to connect to.
+                          The order corresponds to the order in which hosts are contacted.
+    -a,  --ssha       force the creation of a new ssh agent
     -p,  --pass       use sshpass to store ssh password
     -h,  --help       this message
     "
@@ -122,9 +123,13 @@ while [[ $# -gt 0 ]]
 do
     case $1 in
         -u|--username ) user="$2"    ; shift 2 ;;
-        -h1|--host1   ) host1="$2"   ; shift 2 ;;
-        -h2|--host2   ) host2="$2"   ; shift 2 ;;
-        -s|--ssha     ) ssha=1       ; shift   ;;
+        -s|--host     ) host=("$2")  ; shift 2
+                            while [[ -n "$1" && ! "$1" =~ ^- ]]
+                            do
+                                host+=("$1")
+                                shift
+                            done ;;
+        -a|--ssha     ) ssha=1       ; shift   ;;
         -p|--sshp     ) sshp=1       ; shift   ;;
         -h|--help     ) usage ; exit 0 ;;
         *             ) error "Invalid option: $1\n$(usage)" 1 ;;
@@ -132,8 +137,8 @@ do
 done
 
 # Check mandatory options
-[[ -z $host1 ]] && error "host1 missing. Exiting..." 1
-[[ -z $host2 ]] && error "host2 missing. Exiting..." 1
+[[ -z "$host" ]] && error "Server addresses missing for ssh connection. Exiting..." 1
+[[ ${#host[@]} -eq 1 ]] && error "A single server address provided. Exiting..." 1
 
 # Default values
 [[ -z $user ]] && user=$USER
@@ -160,7 +165,7 @@ fi
 #============#
 
 # Check connectivity
-mytest=$($myssh -q -A -4 $host1 echo 0)
+mytest=$($myssh -q -A -4 ${host[0]} echo 0)
 [[ -z "$mytest" ]] && error "Wrong password or no connection. Exiting..." 1
 
 # Set bash options to stop script if a command exit with non-zero status
@@ -181,11 +186,12 @@ info "Port used on localhost: $myport_l"
 set +e
 
 mysocket=/tmp/${USER}_filezilla_socket_$RANDOM
-$myssh -q -M -S $mysocket -fA -o ServerAliveInterval=60 -N $host1 -L ${myport_l}:$host2:22
+jump_host=(${host[@]::${#host[@]}-1})
+$myssh -q -M -S $mysocket -fA -o ServerAliveInterval=60 -L ${myport_l}:${host[-1]}:22 ${jump_host[@]/%/ -N}
 
 # Create trap to close ssh tunnel when interrupt
 #trap "pkill -f \"ssh.* ServerAliveInterval=60 -N $host1 -L ${myport_l}:$host2:22\"" EXIT
-trap "$myssh -q -S $mysocket -O exit $host1" EXIT
+trap "$myssh -q -S $mysocket -O exit ${host[0]}" EXIT
 
 # Start Filezilla
 if [[ -n "$sshp" ]]

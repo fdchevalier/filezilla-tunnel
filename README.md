@@ -25,4 +25,4 @@ For convenience, the script should be accessible system-wide by either including
 
 Run `./filezilla-tunnel.sh -h` to list available options.
 
-Common usage: `filezilla-tunnel.sh -u username -h1 server1 -h2 server2`
+Common usage: `filezilla-tunnel.sh -u username -s server1 server2`
